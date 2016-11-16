@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
 
         mVideoView = (IjkVideoView) findViewById(R.id.video_view);
         String url1 = "http://9890.vod.myqcloud.com/9890_4e292f9a3dd011e6b4078980237cc3d3.f30.mp4";
-        String url2 = "http://hdl1a.douyucdn.cn/live/58428ruL0AF7ICZb.flv?wsAuth=68793ca532f7350e8c8271ddfbb996fc&token=cpn-dotamax-0-58428-1098654df0a8d416edc9b48b64d2ec93&logo=0&expire=0";
+        String url2 = "http://pl.youku.com/playlist/m3u8?vid=454701566&time=1479206476&ts=1479206476&ctype=12&token=2509&keyframe=0&sid=547920641881112285ee8&ev=1&type=hd2&ep=dyaTE0uNUMoB7SveiT8bZSTnISIHXPoP8hiFgNdkBtQmTei2&oip=2096835317";
         List<IjkVideoStreamBean> ijkVideoStreamBeanList = new ArrayList<>();
         IjkVideoStreamBean stream1 = new IjkVideoStreamBean();
         stream1.setName("流畅");
