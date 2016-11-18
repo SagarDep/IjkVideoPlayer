@@ -10,6 +10,9 @@ public class Settings {
     public static final int PLAYER_IJK_MEDIA_PLAYER = 2;
     public static final int PLAYER_IJK_EXO_MEDIA_PLAYER = 3;
 
+    public static final int RENDER_SURFACE_VIEW = 0;
+    public static final int RENDER_TEXTURE_VIEW = 1;
+
     public static final int LAYOUT_FIT_PARENT = 0;
     public static final int LAYOUT_FILL_PARENT = 1;
     public static final int LAYOUT_WRAP_CONTENT = 2;
@@ -25,10 +28,8 @@ public class Settings {
 
 
     public static final String PLAYER_KEY = "ijk_video_player_player";
+    public static final String RENDER_KEY = "ijk_video_player_render";
     public static final String USING_MEDIA_DATA_SOURCE_KEY = "ijk_video_player_using_media_data_source";
-    public static final String ENABLE_SURFACE_VIEW_KEY = "ijk_video_player_enable_surface_view";
-    public static final String ENABLE_TEXTURE_VIEW_KEY = "ijk_video_player_enable_texture_view";
-    public static final String ENABLE_NO_VIEW_KEY = "ijk_video_player_enable_no_view";
     public static final String USING_MEDIA_CODEC_KEY = "ijk_video_player_using_media_codec";
     public static final String USING_MEDIA_CODEC_AUTO_ROTATE_KEY = "ijk_video_player_using_media_codec_auto_rotate";
     public static final String MEDIA_CODEC_HANDLE_RESOLUTION_CHANGE_KEY = "ijk_video_player_media_codec_handle_resolution_change";
@@ -38,6 +39,7 @@ public class Settings {
     public static final String ENABLE_BACKGROUND_PLAY_KEY = "ijk_video_player_enable_background_play";
 
     private SharedPreferences mSharedPreferences;
+    private boolean mEnableLogging = true;
 
     public Settings(Context context) {
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -67,6 +69,30 @@ public class Settings {
                 .apply();
     }
 
+    /**
+     * 获取当前渲染类型
+     *
+     * @return Settings.RENDER_NONE：none
+     * Settings.RENDER_SURFACE_VIEW：Surface
+     * Settings.RENDER_TEXTURE_VIEW：texture
+     */
+    public int getRender() {
+        return mSharedPreferences.getInt(RENDER_KEY, RENDER_SURFACE_VIEW);
+    }
+
+    /**
+     * 设置渲染类型
+     *
+     * @param render Settings.RENDER_NONE：none
+     *               Settings.RENDER_SURFACE_VIEW：Surface
+     *               Settings.RENDER_TEXTURE_VIEW：texture
+     */
+    public void setRender(int render) {
+        mSharedPreferences.edit()
+                .putInt(RENDER_KEY, render)
+                .apply();
+    }
+
     public boolean getUsingMediaDataSource() {
         return mSharedPreferences.getBoolean(USING_MEDIA_DATA_SOURCE_KEY, false);
     }
@@ -74,36 +100,6 @@ public class Settings {
     public void setUsingMediaDataSource(boolean usingMediaDataSource) {
         mSharedPreferences.edit()
                 .putBoolean(USING_MEDIA_DATA_SOURCE_KEY, usingMediaDataSource)
-                .apply();
-    }
-
-    public boolean getEnableSurfaceView() {
-        return mSharedPreferences.getBoolean(ENABLE_SURFACE_VIEW_KEY, false);
-    }
-
-    public void setEnableSurfaceView(boolean enableSurfaceView) {
-        mSharedPreferences.edit()
-                .putBoolean(ENABLE_SURFACE_VIEW_KEY, enableSurfaceView)
-                .apply();
-    }
-
-    public boolean getEnableTextureView() {
-        return mSharedPreferences.getBoolean(ENABLE_TEXTURE_VIEW_KEY, false);
-    }
-
-    public void setEnableTextureView(boolean enableTextureView) {
-        mSharedPreferences.edit()
-                .putBoolean(ENABLE_TEXTURE_VIEW_KEY, enableTextureView)
-                .apply();
-    }
-
-    public boolean getEnableNoView() {
-        return mSharedPreferences.getBoolean(ENABLE_NO_VIEW_KEY, false);
-    }
-
-    public void setEnableNoView(boolean enableNoView) {
-        mSharedPreferences.edit()
-                .putBoolean(ENABLE_NO_VIEW_KEY, enableNoView)
                 .apply();
     }
 
@@ -245,6 +241,24 @@ public class Settings {
         mSharedPreferences.edit()
                 .putBoolean(ENABLE_BACKGROUND_PLAY_KEY, enableBackgroundPlay)
                 .apply();
+    }
+
+    /**
+     * 是否启用调试Log日志
+     *
+     * @return true使用，false未使用
+     */
+    public boolean getEnableLogging() {
+        return mEnableLogging;
+    }
+
+    /**
+     * 设置是否启用调试Log日志
+     *
+     * @param enableLogging true使用，false未使用
+     */
+    public void setEnableLogging(boolean enableLogging) {
+        this.mEnableLogging = enableLogging;
     }
 
 }

@@ -46,6 +46,7 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -59,6 +60,7 @@ import com.frank.ijkvideoplayer.widget.setting.Settings;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -144,6 +146,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private OnOrientationChangedListener mOnOrientationChangedListener;
 
     private boolean mEnableBackgroundPlay;
+    private boolean mEnableLogging;
     private boolean mForceFullScreen;
     private boolean mForcePortrait;
     private boolean mLockRotation;
@@ -174,10 +177,15 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private TextView tv_current_time;
     private TextView tv_end_time;
     private ImageView iv_pause;
-    private ProgressBar pb_loading;
     private LinearLayout ll_volume_brightness_container;
     private ImageView iv_volume_brightness;
     private TextView tv_volume_brightness;
+    private LinearLayout ll_loading_container;
+    private ProgressBar pb_loading;
+    private TextView tv_loading_description;
+    private LinearLayout ll_error_container;
+    private TextView tv_error_message;
+    private Button btn_error_action;
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -232,6 +240,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
         mAppContext = mActivity.getApplicationContext();
         mSettings = new Settings(mAppContext);
+        mEnableLogging = mSettings.getEnableLogging();
         mCurrentAspectRatio = Settings.LAYOUT_FILL_PARENT;
         mScreenWidth = mActivity.getResources().getDisplayMetrics().widthPixels;
         mScreenHeight = mActivity.getResources().getDisplayMetrics().heightPixels;
@@ -301,7 +310,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mTargetState = STATE_IDLE;
     }
 
-    public void onStop() {
+    public void destroy() {
         mOrientationEventListener.disable();
         if (!isBackgroundPlayEnabled()) {
             stopPlayback();
@@ -343,6 +352,60 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         }
     }
 
+    private void initRenders() {
+        int render = mSettings.getRender();
+        switch (render) {
+            case Settings.RENDER_TEXTURE_VIEW:
+                TextureRenderView textureRenderView = new TextureRenderView(getContext());
+                if (mMediaPlayer != null) {
+                    textureRenderView.getSurfaceHolder().bindToMediaPlayer(mMediaPlayer);
+                    textureRenderView.setVideoSize(mMediaPlayer.getVideoWidth(), mMediaPlayer.getVideoHeight());
+                    textureRenderView.setVideoSampleAspectRatio(mMediaPlayer.getVideoSarNum(), mMediaPlayer.getVideoSarDen());
+                    textureRenderView.setAspectRatio(mCurrentAspectRatio);
+                }
+                setRenderView(textureRenderView);
+                break;
+            case Settings.RENDER_SURFACE_VIEW:
+                SurfaceRenderView surfaceRenderView = new SurfaceRenderView(getContext());
+                setRenderView(surfaceRenderView);
+                break;
+            default:
+                SurfaceRenderView renderView = new SurfaceRenderView(getContext());
+                setRenderView(renderView);
+                break;
+        }
+    }
+
+    public void setRenderView(IRenderView renderView) {
+        if (mRenderView != null) {
+            if (mMediaPlayer != null)
+                mMediaPlayer.setDisplay(null);
+
+            View renderUIView = mRenderView.getView();
+            mRenderView.removeRenderCallback(mSHCallback);
+            mRenderView = null;
+            removeView(renderUIView);
+        }
+        if (renderView == null) {
+            return;
+        }
+        mRenderView = renderView;
+        renderView.setAspectRatio(mCurrentAspectRatio);
+        if (mVideoWidth > 0 && mVideoHeight > 0)
+            renderView.setVideoSize(mVideoWidth, mVideoHeight);
+        if (mVideoSarNum > 0 && mVideoSarDen > 0)
+            renderView.setVideoSampleAspectRatio(mVideoSarNum, mVideoSarDen);
+        View renderUIView = mRenderView.getView();
+        LayoutParams lp = new LayoutParams(
+                LayoutParams.WRAP_CONTENT,
+                LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER);
+        renderUIView.setLayoutParams(lp);
+        addView(renderUIView);
+        mRenderView.addRenderCallback(mSHCallback);
+        mRenderView.setVideoRotation(mVideoRotationDegree);
+    }
+
     private void initControlPanel() {
         if (mControlPanelLayout != null) {
             removeView(mControlPanelLayout);
@@ -351,10 +414,17 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         LayoutInflater inflate = (LayoutInflater) mAppContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         mControlPanelLayout = inflate.inflate(R.layout.ijk_video_player_control_panel, this, false);
 
-        pb_loading = (ProgressBar) mControlPanelLayout.findViewById(R.id.pb_loading);
         ll_volume_brightness_container = (LinearLayout) mControlPanelLayout.findViewById(R.id.ll_volume_brightness_container);
         iv_volume_brightness = (ImageView) mControlPanelLayout.findViewById(R.id.iv_volume_brightness);
         tv_volume_brightness = (TextView) mControlPanelLayout.findViewById(R.id.tv_volume_brightness);
+
+        ll_loading_container = (LinearLayout) mControlPanelLayout.findViewById(R.id.ll_loading_container);
+        pb_loading = (ProgressBar) mControlPanelLayout.findViewById(R.id.pb_loading);
+        tv_loading_description = (TextView) mControlPanelLayout.findViewById(R.id.tv_loading_description);
+
+        ll_error_container = (LinearLayout) mControlPanelLayout.findViewById(R.id.ll_error_container);
+        tv_error_message = (TextView) mControlPanelLayout.findViewById(R.id.tv_error_message);
+        btn_error_action = (Button) mControlPanelLayout.findViewById(R.id.btn_error_action);
 
         addView(mControlPanelLayout);
     }
@@ -464,66 +534,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         return position;
     }
 
-    public void setRenderView(IRenderView renderView) {
-        if (mRenderView != null) {
-            if (mMediaPlayer != null)
-                mMediaPlayer.setDisplay(null);
-
-            View renderUIView = mRenderView.getView();
-            mRenderView.removeRenderCallback(mSHCallback);
-            mRenderView = null;
-            removeView(renderUIView);
-        }
-
-        if (renderView == null)
-            return;
-
-        mRenderView = renderView;
-        renderView.setAspectRatio(mCurrentAspectRatio);
-        if (mVideoWidth > 0 && mVideoHeight > 0)
-            renderView.setVideoSize(mVideoWidth, mVideoHeight);
-        if (mVideoSarNum > 0 && mVideoSarDen > 0)
-            renderView.setVideoSampleAspectRatio(mVideoSarNum, mVideoSarDen);
-
-        View renderUIView = mRenderView.getView();
-        LayoutParams lp = new LayoutParams(
-                LayoutParams.WRAP_CONTENT,
-                LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER);
-        renderUIView.setLayoutParams(lp);
-        addView(renderUIView);
-
-        mRenderView.addRenderCallback(mSHCallback);
-        mRenderView.setVideoRotation(mVideoRotationDegree);
-    }
-
-    public void setRender(int render) {
-        switch (render) {
-            case RENDER_NONE:
-                setRenderView(null);
-                break;
-            case RENDER_TEXTURE_VIEW: {
-                TextureRenderView renderView = new TextureRenderView(getContext());
-                if (mMediaPlayer != null) {
-                    renderView.getSurfaceHolder().bindToMediaPlayer(mMediaPlayer);
-                    renderView.setVideoSize(mMediaPlayer.getVideoWidth(), mMediaPlayer.getVideoHeight());
-                    renderView.setVideoSampleAspectRatio(mMediaPlayer.getVideoSarNum(), mMediaPlayer.getVideoSarDen());
-                    renderView.setAspectRatio(mCurrentAspectRatio);
-                }
-                setRenderView(renderView);
-                break;
-            }
-            case RENDER_SURFACE_VIEW: {
-                SurfaceRenderView renderView = new SurfaceRenderView(getContext());
-                setRenderView(renderView);
-                break;
-            }
-            default:
-                Log.e(TAG, String.format(Locale.getDefault(), "invalid render %d\n", render));
-                break;
-        }
-    }
-
     public void setAspectRatio(int aspectRatio) {
         mCurrentAspectRatio = aspectRatio;
         if (mRenderView != null) {
@@ -584,9 +594,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mHeaders = headers;
         mSeekWhenPrepared = 0;
         if (mLive) {
-            hideSeekBarView();
+            setSeekBarVisible(false);
         } else {
-            showSeekBarView();
+            setSeekBarVisible(true);
         }
         openVideo();
         requestLayout();
@@ -633,9 +643,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mUri = Uri.parse(ijkVideoStreamBean.getUri());
         mLive = ijkVideoStreamBean.isLive();
         if (mLive) {
-            hideSeekBarView();
+            setSeekBarVisible(false);
         } else {
-            showSeekBarView();
+            setSeekBarVisible(true);
         }
     }
 
@@ -660,6 +670,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         }
                         mCurrentStreamIndex = position;
                         switchStream(position);
+                        tv_loading_description.setText(getResources().getString(R.string.streams_switching));
+                        setLoadingDescriptionVisible(true);
+                        setLoadingContainerVisible(true);
                         if (mLive) {
                             setVideoURI(mUri, true);
                         } else {
@@ -667,6 +680,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                             seekTo(mCurrentPosition);
                         }
                         refreshStreamList();
+                        start();
                     }
                 }
             });
@@ -768,18 +782,12 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             // target state that was there before.
             mCurrentState = STATE_PREPARING;
             attachMediaController();
-        } catch (IOException ex) {
-            Log.w(TAG, "Unable to open content: " + mUri, ex);
+        } catch (Exception e) {
+            e.printStackTrace();
+            log("Unable to open content: " + mUri);
             mCurrentState = STATE_ERROR;
             mTargetState = STATE_ERROR;
             mErrorListener.onError(mMediaPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0);
-        } catch (IllegalArgumentException ex) {
-            Log.w(TAG, "Unable to open content: " + mUri, ex);
-            mCurrentState = STATE_ERROR;
-            mTargetState = STATE_ERROR;
-            mErrorListener.onError(mMediaPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0);
-        } finally {
-            // REMOVED: mPendingSubtitleTracks.clear();
         }
     }
 
@@ -808,7 +816,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
         @Override
         public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-            Log.e(TAG, "progress:" + progress);
             if (!fromUser) {
                 // We're not interested in programmatically generated changes to
                 // the progress bar's position.
@@ -833,6 +840,13 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             // the call to show() does not guarantee this because it is a
             // no-op if we are already showing.
             mHandler.sendEmptyMessage(MSG_SHOW_PROGRESS);
+        }
+    };
+
+    private OnClickListener mReplayClickListener = new OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            replay();
         }
     };
 
@@ -876,7 +890,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 seekTo(seekToPosition);
             }
             if (mVideoWidth != 0 && mVideoHeight != 0) {
-                //Log.i("@@@@", "video size: " + mVideoWidth +"/"+ mVideoHeight);
                 // REMOVED: getHolder().setFixedSize(mVideoWidth, mVideoHeight);
                 if (mRenderView != null) {
                     mRenderView.setVideoSize(mVideoWidth, mVideoHeight);
@@ -887,7 +900,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         // start the video here instead of in the callback.
                         if (mTargetState == STATE_PLAYING) {
                             start();
-                            hideLoadingView();
+                            setLoadingContainerVisible(false);
                             if (mMediaControllerLayout != null) {
                                 showMediaController();
                             }
@@ -933,47 +946,63 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                     }
                     switch (arg1) {
                         case IMediaPlayer.MEDIA_INFO_VIDEO_TRACK_LAGGING:
-                            Log.d(TAG, "MEDIA_INFO_VIDEO_TRACK_LAGGING:");
+                            // 视频日志跟踪
+                            log("MEDIA_INFO_VIDEO_TRACK_LAGGING");
                             break;
                         case IMediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START:
-                            Log.d(TAG, "MEDIA_INFO_VIDEO_RENDERING_START:");
+                            // 开始视频渲染
+                            log("MEDIA_INFO_VIDEO_RENDERING_START");
+                            setLoadingContainerVisible(false);
+                            setErrorContainerVisible(false);
                             break;
                         case IMediaPlayer.MEDIA_INFO_BUFFERING_START:
-                            Log.d(TAG, "MEDIA_INFO_BUFFERING_START:");
-                            showLoadingView();
+                            // 开始缓冲
+                            log("MEDIA_INFO_BUFFERING_START");
+                            setLoadingDescriptionVisible(false);
+                            setLoadingContainerVisible(true);
                             break;
                         case IMediaPlayer.MEDIA_INFO_BUFFERING_END:
-                            Log.d(TAG, "MEDIA_INFO_BUFFERING_END:");
-                            hideLoadingView();
+                            // 缓冲结束
+                            log("MEDIA_INFO_BUFFERING_END");
+                            setLoadingContainerVisible(false);
                             break;
                         case IMediaPlayer.MEDIA_INFO_NETWORK_BANDWIDTH:
-                            Log.d(TAG, "MEDIA_INFO_NETWORK_BANDWIDTH: " + arg2);
+                            // 网络带宽
+                            log("MEDIA_INFO_NETWORK_BANDWIDTH" + arg2);
                             break;
                         case IMediaPlayer.MEDIA_INFO_BAD_INTERLEAVING:
-                            Log.d(TAG, "MEDIA_INFO_BAD_INTERLEAVING:");
+                            // 交叉存取异常
+                            log("MEDIA_INFO_BAD_INTERLEAVING");
                             break;
                         case IMediaPlayer.MEDIA_INFO_NOT_SEEKABLE:
-                            Log.d(TAG, "MEDIA_INFO_NOT_SEEKABLE:");
+                            // 不可拖动
+                            log("MEDIA_INFO_NOT_SEEKABLE");
                             break;
                         case IMediaPlayer.MEDIA_INFO_METADATA_UPDATE:
-                            Log.d(TAG, "MEDIA_INFO_METADATA_UPDATE:");
+                            // meta数据更新
+                            log("MEDIA_INFO_METADATA_UPDATE");
                             break;
                         case IMediaPlayer.MEDIA_INFO_UNSUPPORTED_SUBTITLE:
-                            Log.d(TAG, "MEDIA_INFO_UNSUPPORTED_SUBTITLE:");
+                            // 不支持字幕
+                            log("MEDIA_INFO_UNSUPPORTED_SUBTITLE");
                             break;
                         case IMediaPlayer.MEDIA_INFO_SUBTITLE_TIMED_OUT:
-                            Log.d(TAG, "MEDIA_INFO_SUBTITLE_TIMED_OUT:");
+                            // 字幕请求超时
+                            log("MEDIA_INFO_SUBTITLE_TIMED_OUT");
                             break;
                         case IMediaPlayer.MEDIA_INFO_VIDEO_ROTATION_CHANGED:
+                            // 视频方向更改
+                            log("MEDIA_INFO_VIDEO_ROTATION_CHANGED:" + arg2);
                             mVideoRotationDegree = arg2;
-                            Log.d(TAG, "MEDIA_INFO_VIDEO_ROTATION_CHANGED: " + arg2);
                             if (mRenderView != null) {
                                 mRenderView.setVideoRotation(arg2);
                             }
                             break;
                         case IMediaPlayer.MEDIA_INFO_AUDIO_RENDERING_START:
-                            Log.d(TAG, "MEDIA_INFO_AUDIO_RENDERING_START:");
-                            hideLoadingView();
+                            // 开始音频渲染
+                            log("MEDIA_INFO_AUDIO_RENDERING_START:");
+                            setLoadingContainerVisible(false);
+                            setErrorContainerVisible(false);
                             break;
                     }
                     return true;
@@ -983,7 +1012,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private IMediaPlayer.OnErrorListener mErrorListener =
             new IMediaPlayer.OnErrorListener() {
                 public boolean onError(IMediaPlayer mp, int framework_err, int impl_err) {
-                    Log.d(TAG, "Error: " + framework_err + "," + impl_err);
+                    log("Error: " + framework_err + "," + impl_err);
                     mCurrentState = STATE_ERROR;
                     mTargetState = STATE_ERROR;
                     if (mMediaControllerLayout != null) {
@@ -994,6 +1023,30 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         if (mOnErrorListener.onError(mMediaPlayer, framework_err, impl_err)) {
                             return true;
                         }
+                    }
+                    switch (framework_err) {
+                        case IMediaPlayer.MEDIA_ERROR_UNKNOWN: // 未知错误
+                        case IMediaPlayer.MEDIA_ERROR_SERVER_DIED: // 服务器错误
+                        case IMediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK: // 连续播放错误
+                        case IMediaPlayer.MEDIA_ERROR_IO: // IO读写错误
+                        case IMediaPlayer.MEDIA_ERROR_UNSUPPORTED: // 格式不支持错误
+                            tv_error_message.setText(getResources().getString(R.string.error_unknown));
+                            btn_error_action.setText(getResources().getString(R.string.retrieve));
+                            btn_error_action.setOnClickListener(mReplayClickListener);
+                            setErrorContainerVisible(true);
+                            break;
+                        case IMediaPlayer.MEDIA_ERROR_TIMED_OUT: // 超时错误
+                            tv_error_message.setText(getResources().getString(R.string.error_timeout));
+                            btn_error_action.setText(getResources().getString(R.string.retrieve));
+                            btn_error_action.setOnClickListener(mReplayClickListener);
+                            setErrorContainerVisible(true);
+                            break;
+                        default:
+                            tv_error_message.setText(getResources().getString(R.string.error_unknown));
+                            btn_error_action.setText(getResources().getString(R.string.retrieve));
+                            btn_error_action.setOnClickListener(mReplayClickListener);
+                            setErrorContainerVisible(true);
+                            break;
                     }
                     return true;
                 }
@@ -1073,7 +1126,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         @Override
         public void onSurfaceChanged(@NonNull IRenderView.ISurfaceHolder holder, int format, int w, int h) {
             if (holder.getRenderView() != mRenderView) {
-                Log.e(TAG, "onSurfaceChanged: unmatched render callback\n");
+                log("onSurfaceChanged: unmatched render callback\n");
                 return;
             }
 
@@ -1092,7 +1145,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         @Override
         public void onSurfaceCreated(@NonNull IRenderView.ISurfaceHolder holder, int width, int height) {
             if (holder.getRenderView() != mRenderView) {
-                Log.e(TAG, "onSurfaceCreated: unmatched render callback\n");
+                log("onSurfaceCreated: unmatched render callback\n");
                 return;
             }
 
@@ -1106,7 +1159,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         @Override
         public void onSurfaceDestroyed(@NonNull IRenderView.ISurfaceHolder holder) {
             if (holder.getRenderView() != mRenderView) {
-                Log.e(TAG, "onSurfaceDestroyed: unmatched render callback\n");
+                log("onSurfaceDestroyed: unmatched render callback\n");
                 return;
             }
 
@@ -1162,7 +1215,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             if (keyCode == KeyEvent.KEYCODE_HEADSETHOOK ||
                     keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
                 if (mMediaPlayer.isPlaying()) {
-                    pause();
+                    stop();
                     showMediaController();
                 } else {
                     start();
@@ -1178,7 +1231,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             } else if (keyCode == KeyEvent.KEYCODE_MEDIA_STOP
                     || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
                 if (mMediaPlayer.isPlaying()) {
-                    pause();
+                    stop();
                     showMediaController();
                 }
                 return true;
@@ -1245,7 +1298,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             case MotionEvent.ACTION_UP:
                 mMediaControllerDragging = false;
                 toggleMediaControllerVisibility();
-                hideVolumeBrightnessView();
+                setVolumeBrightnessVisible(false);
                 mVolume = -1;
                 mBrightness = -1f;
                 break;
@@ -1261,15 +1314,12 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             }
         }
         int index = (int) (percent * mMaxVolume) + mVolume;
-        if (index > mMaxVolume)
+        if (index > mMaxVolume) {
             index = mMaxVolume;
-        else if (index < 0)
+        } else if (index < 0) {
             index = 0;
-
-        // 变更声音
+        }
         mAudioManager.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0);
-
-        // 变更进度条
         int i = (int) (index * 1.0 / mMaxVolume * 100);
         String s = i + "%";
         if (i == 0) {
@@ -1278,7 +1328,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         if (ll_volume_brightness_container != null) {
             iv_volume_brightness.setImageResource(R.drawable.ic_volume);
             tv_volume_brightness.setText(s);
-            showVolumeBrightnessView();
+            setVolumeBrightnessVisible(true);
         }
     }
 
@@ -1301,8 +1351,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mActivity.getWindow().setAttributes(lpa);
         if (ll_volume_brightness_container != null) {
             iv_volume_brightness.setImageResource(R.drawable.ic_brightness);
-            tv_volume_brightness.setText(((int) (lpa.screenBrightness * 100)) + "%");
-            showVolumeBrightnessView();
+            tv_volume_brightness.setText(getPercent(lpa.screenBrightness));
+            setVolumeBrightnessVisible(true);
         }
     }
 
@@ -1320,7 +1370,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         }
         int showDelta = (int) delta / 1000;
         if (showDelta != 0 && sb_progress != null) {
-            Log.e(TAG, position + "newPosition:" + newPosition);
             if (newPosition >= 0) {
                 seekTo((int) newPosition);
             }
@@ -1329,12 +1378,12 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             }
             if (showDelta > 0) {
                 iv_volume_brightness.setImageResource(android.R.drawable.ic_media_ff);
-                tv_volume_brightness.setText("+" + " " + showDelta);
+                tv_volume_brightness.setText("+" + " " + showDelta + " " + "s");
             } else if (showDelta < 0) {
                 iv_volume_brightness.setImageResource(android.R.drawable.ic_media_rew);
-                tv_volume_brightness.setText(String.valueOf(showDelta));
+                tv_volume_brightness.setText(String.valueOf(showDelta) + " " + "s");
             }
-            showVolumeBrightnessView();
+            setVolumeBrightnessVisible(true);
             setMediaControllerProgress();
             updatePausePlay();
             showMediaController(MEDIA_CONTROLLER_TIMEOUT);
@@ -1445,7 +1494,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     private void doPauseResume() {
         if (isPlaying()) {
-            pause();
+            stop();
         } else {
             start();
         }
@@ -1550,7 +1599,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mHandler.sendEmptyMessage(MSG_SHOW_PROGRESS);
     }
 
-    public void pause() {
+    public void stop() {
         if (isInPlaybackState()) {
             if (mMediaPlayer.isPlaying()) {
                 mMediaPlayer.pause();
@@ -1560,12 +1609,16 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mTargetState = STATE_PAUSED;
     }
 
-    public void suspend() {
-        release(false);
-    }
-
-    public void resume() {
-        openVideo();
+    public void replay() {
+        setLoadingDescriptionVisible(false);
+        setLoadingContainerVisible(true);
+        if (mLive) {
+            setVideoURI(mUri, true);
+        } else {
+            setVideoURI(mUri, false);
+            seekTo(mCurrentPosition);
+        }
+        start();
     }
 
     public int getDuration() {
@@ -1611,42 +1664,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 mCurrentState != STATE_PREPARING);
     }
 
-    // REMOVED: getAudioSessionId();
-    // REMOVED: onAttachedToWindow();
-    // REMOVED: onDetachedFromWindow();
-    // REMOVED: onLayout();
-    // REMOVED: draw();
-    // REMOVED: measureAndLayoutSubtitleWidget();
-    // REMOVED: setSubtitleWidget();
-    // REMOVED: getSubtitleLooper();
-
-    //-------------------------
-    // Extend: Render
-    //-------------------------
-    public static final int RENDER_NONE = 0;
-    public static final int RENDER_SURFACE_VIEW = 1;
-    public static final int RENDER_TEXTURE_VIEW = 2;
-
-    private List<Integer> mAllRenders = new ArrayList<Integer>();
-    private int mCurrentRenderIndex = 0;
-    private int mCurrentRender = RENDER_NONE;
-
-    private void initRenders() {
-        mAllRenders.clear();
-
-        if (mSettings.getEnableSurfaceView())
-            mAllRenders.add(RENDER_SURFACE_VIEW);
-        if (mSettings.getEnableTextureView() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-            mAllRenders.add(RENDER_TEXTURE_VIEW);
-        if (mSettings.getEnableNoView())
-            mAllRenders.add(RENDER_NONE);
-
-        if (mAllRenders.isEmpty())
-            mAllRenders.add(RENDER_SURFACE_VIEW);
-        mCurrentRender = mAllRenders.get(mCurrentRenderIndex);
-        setRender(mCurrentRender);
-    }
-
     public IMediaPlayer createPlayer(int playerType) {
         IMediaPlayer mediaPlayer;
         switch (playerType) {
@@ -1660,7 +1677,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 IjkMediaPlayer ijkMediaPlayer = null;
                 if (mUri != null) {
                     ijkMediaPlayer = new IjkMediaPlayer();
-                    IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_DEBUG);
 
                     if (mSettings.getUsingMediaCodec()) {
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1);
@@ -1741,6 +1757,14 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         }
     }
 
+    private String getPercent(double value) {
+        NumberFormat numberFormat = NumberFormat.getPercentInstance(Locale.US);
+        numberFormat.setMinimumFractionDigits(0);
+        numberFormat.setMaximumFractionDigits(0);
+        numberFormat.setGroupingUsed(false);
+        return numberFormat.format(value);
+    }
+
     public ITrackInfo[] getTrackInfo() {
         if (mMediaPlayer == null)
             return null;
@@ -1760,108 +1784,88 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         return MediaPlayerCompat.getSelectedTrack(mMediaPlayer, trackType);
     }
 
-    public void showLoadingView() {
-        if (pb_loading != null && !mMediaControllerDragging) {
-            pb_loading.setVisibility(View.VISIBLE);
-            if (iv_pause != null) {
-                iv_pause.setVisibility(View.GONE);
+    private void log(String message) {
+        if (mEnableLogging) {
+            Log.d(TAG, message);
+        }
+    }
+
+    public void setLoadingContainerVisible(boolean visible) {
+        if (visible && !mMediaControllerDragging) {
+            setViewVisible(ll_loading_container, true);
+            setViewVisible(ll_error_container, false);
+            setViewVisible(iv_pause, false);
+        } else {
+            setViewVisible(ll_loading_container, false);
+            setViewVisible(iv_pause, true);
+        }
+    }
+
+    public void setVolumeBrightnessVisible(boolean visible) {
+        if (visible) {
+            setViewVisible(ll_volume_brightness_container, true);
+        } else {
+            setViewVisible(ll_volume_brightness_container, false);
+        }
+    }
+
+    public void setStreamListVisible(boolean visible) {
+        setViewVisible(rl_stream_list_container, visible);
+    }
+
+    public void setTopFullscreenVisible(boolean visible) {
+        setViewVisible(iv_top_fullscreen, visible);
+    }
+
+    public void setLockRotationVisible(boolean visible) {
+        setViewVisible(iv_lock_rotation, visible);
+    }
+
+    public void setBottomFullscreenVisible(boolean visible) {
+        setViewVisible(iv_bottom_fullscreen, visible);
+    }
+
+    public void setSeekBarVisible(boolean visible) {
+        if (visible) {
+            setViewVisible(sb_progress, true);
+            setViewVisible(tv_current_time, true);
+            setViewVisible(tv_end_time, true);
+        } else {
+            if (sb_progress != null) {
+                sb_progress.setVisibility(View.INVISIBLE);
+            }
+            if (tv_current_time != null) {
+                tv_current_time.setVisibility(View.INVISIBLE);
+            }
+            if (tv_end_time != null) {
+                tv_end_time.setVisibility(View.INVISIBLE);
             }
         }
     }
 
-    public void hideLoadingView() {
-        if (pb_loading != null) {
-            pb_loading.setVisibility(View.GONE);
-            if (iv_pause != null) {
-                iv_pause.setVisibility(View.VISIBLE);
-            }
+    public void setErrorContainerVisible(boolean visible) {
+        if (visible) {
+            setViewVisible(ll_error_container, true);
+            setViewVisible(ll_loading_container, false);
+            setViewVisible(iv_pause, false);
+        } else {
+            setViewVisible(ll_error_container, false);
+            setViewVisible(iv_pause, true);
         }
     }
 
-    public void showVolumeBrightnessView() {
-        if (ll_volume_brightness_container != null) {
-            ll_volume_brightness_container.setVisibility(View.VISIBLE);
-            if (iv_pause != null && iv_pause.getVisibility() == View.VISIBLE) {
-                iv_pause.setVisibility(GONE);
-            }
-        }
+    public void setLoadingDescriptionVisible(boolean visible) {
+        setViewVisible(tv_loading_description, visible);
     }
 
-    public void hideVolumeBrightnessView() {
-        if (ll_volume_brightness_container != null) {
-            ll_volume_brightness_container.setVisibility(View.GONE);
+    private void setViewVisible(View view, boolean visible) {
+        if (view == null) {
+            return;
         }
-    }
-
-    public void showStreamListView() {
-        if (rl_stream_list_container != null) {
-            rl_stream_list_container.setVisibility(View.VISIBLE);
-        }
-    }
-
-    public void hideStreamListView() {
-        if (rl_stream_list_container != null) {
-            rl_stream_list_container.setVisibility(View.GONE);
-        }
-    }
-
-    public void showTopFullscreenView() {
-        if (iv_top_fullscreen != null) {
-            iv_top_fullscreen.setVisibility(View.VISIBLE);
-        }
-    }
-
-    public void hideTopFullscreenView() {
-        if (iv_top_fullscreen != null) {
-            iv_top_fullscreen.setVisibility(View.GONE);
-        }
-    }
-
-    public void showLockRotationView() {
-        if (iv_lock_rotation != null) {
-            iv_lock_rotation.setVisibility(View.VISIBLE);
-        }
-    }
-
-    public void hideLockRotationView() {
-        if (iv_lock_rotation != null) {
-            iv_lock_rotation.setVisibility(View.GONE);
-        }
-    }
-
-    public void showBottomFullscreenView() {
-        if (iv_bottom_fullscreen != null) {
-            iv_bottom_fullscreen.setVisibility(View.VISIBLE);
-        }
-    }
-
-    public void hideBottomFullscreenView() {
-        if (iv_bottom_fullscreen != null) {
-            iv_bottom_fullscreen.setVisibility(View.GONE);
-        }
-    }
-
-    public void showSeekBarView() {
-        if (sb_progress != null) {
-            sb_progress.setVisibility(View.VISIBLE);
-        }
-        if (tv_current_time != null) {
-            tv_current_time.setVisibility(View.VISIBLE);
-        }
-        if (tv_end_time != null) {
-            tv_end_time.setVisibility(View.VISIBLE);
-        }
-    }
-
-    public void hideSeekBarView() {
-        if (sb_progress != null) {
-            sb_progress.setVisibility(View.INVISIBLE);
-        }
-        if (tv_current_time != null) {
-            tv_current_time.setVisibility(View.INVISIBLE);
-        }
-        if (tv_end_time != null) {
-            tv_end_time.setVisibility(View.INVISIBLE);
+        if (visible) {
+            view.setVisibility(VISIBLE);
+        } else {
+            view.setVisibility(GONE);
         }
     }
 

@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">IjkVideoPlayer</string>
+    <string name="streams_switching">正在切换</string>
+    <string name="replay">重新播放</string>
+    <string name="retrieve">重新获取</string>
+    <string name="error_unknown">未知错误</string>
+    <string name="error_timeout">请求超时</string>
 </resources>
