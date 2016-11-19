@@ -59,7 +59,6 @@ import com.frank.ijkvideoplayer.R;
 import com.frank.ijkvideoplayer.widget.setting.Settings;
 
 import java.io.File;
-import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -170,6 +169,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private ImageView iv_back;
     private TextView tv_title;
     private RelativeLayout rl_stream_list_container;
+    private TextView tv_subscribe;
     private ImageView iv_top_fullscreen;
     private ImageView iv_bottom_fullscreen;
     private ImageView iv_lock_rotation;
@@ -658,6 +658,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             IjkVideoStreamBean ijkVideoStreamBean = mIjkVideoStreamList.get(i);
             ijkVideoStreamBean.setIndex(i);
             TextView textView = new TextView(mActivity);
+            textView.setTextSize(8);
+            textView.setGravity(Gravity.CENTER);
             textView.setTag(ijkVideoStreamBean);
             textView.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -670,8 +672,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         }
                         mCurrentStreamIndex = position;
                         switchStream(position);
-                        tv_loading_description.setText(getResources().getString(R.string.streams_switching));
-                        setLoadingDescriptionVisible(true);
+                        showLoadingDescription(getResources().getString(R.string.streams_switching));
                         setLoadingContainerVisible(true);
                         if (mLive) {
                             setVideoURI(mUri, true);
@@ -679,7 +680,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                             setVideoURI(mUri, false);
                             seekTo(mCurrentPosition);
                         }
-                        refreshStreamList();
+                        updateStreamListState();
                         start();
                     }
                 }
@@ -691,18 +692,17 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             relativeLayoutparams.addRule(RelativeLayout.CENTER_VERTICAL, RelativeLayout.TRUE);
             rl_stream_list_container.addView(textView, relativeLayoutparams);
         }
-        refreshStreamList();
+        addSubscribeButton(mIjkVideoStreamList.size());
+        updateStreamListState();
     }
 
-    public void refreshStreamList() {
+    public void updateStreamListState() {
         int childCount = rl_stream_list_container.getChildCount();
         for (int i = 0; i < childCount; i++) {
             TextView child = (TextView) rl_stream_list_container.getChildAt(i);
             IjkVideoStreamBean ijkVideoStreamBean = (IjkVideoStreamBean) child.getTag();
             if (ijkVideoStreamBean != null) {
                 child.setText(ijkVideoStreamBean.getName());
-                child.setTextSize(8);
-                child.setGravity(Gravity.CENTER);
                 if (ijkVideoStreamBean.isSelected()) {
                     child.setTextColor(0xFFFFFFFF);
                     child.setBackgroundDrawable(mActivity.getResources().getDrawable(R.drawable.ijk_video_player_round_corner_white));
@@ -714,8 +714,20 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         }
     }
 
-    // REMOVED: addSubtitleSource
-    // REMOVED: mPendingSubtitleTracks
+    public void addSubscribeButton(int index) {
+        tv_subscribe = new TextView(mActivity);
+        tv_subscribe.setTextColor(0xFFFFFFFF);
+        tv_subscribe.setTextSize(8);
+        tv_subscribe.setGravity(Gravity.CENTER);
+        tv_subscribe.setBackgroundDrawable(mActivity.getResources().getDrawable(R.drawable.ijk_video_player_round_corner_white));
+        tv_subscribe.setVisibility(GONE);
+        RelativeLayout.LayoutParams relativeLayoutparams = new RelativeLayout.LayoutParams(
+                MeasureHelper.dp2px(mActivity, 40), MeasureHelper.dp2px(mActivity, 20));
+        relativeLayoutparams.rightMargin = MeasureHelper.dp2px(mActivity, index * 40);
+        relativeLayoutparams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT, RelativeLayout.TRUE);
+        relativeLayoutparams.addRule(RelativeLayout.CENTER_VERTICAL, RelativeLayout.TRUE);
+        rl_stream_list_container.addView(tv_subscribe, relativeLayoutparams);
+    }
 
     public void stopPlayback() {
         if (mMediaPlayer != null) {
@@ -958,7 +970,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         case IMediaPlayer.MEDIA_INFO_BUFFERING_START:
                             // 开始缓冲
                             log("MEDIA_INFO_BUFFERING_START");
-                            setLoadingDescriptionVisible(false);
+                            hideLoadingDescription();
                             setLoadingContainerVisible(true);
                             break;
                         case IMediaPlayer.MEDIA_INFO_BUFFERING_END:
@@ -969,6 +981,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         case IMediaPlayer.MEDIA_INFO_NETWORK_BANDWIDTH:
                             // 网络带宽
                             log("MEDIA_INFO_NETWORK_BANDWIDTH" + arg2);
+                            tv_loading_description.setText(getSpeedFormatSize(arg2));
+                            showLoadingDescription(getSpeedFormatSize(arg2));
                             break;
                         case IMediaPlayer.MEDIA_INFO_BAD_INTERLEAVING:
                             // 交叉存取异常
@@ -1610,7 +1624,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void replay() {
-        setLoadingDescriptionVisible(false);
+        hideLoadingDescription();
         setLoadingContainerVisible(true);
         if (mLive) {
             setVideoURI(mUri, true);
@@ -1765,6 +1779,19 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         return numberFormat.format(value);
     }
 
+    private String getSpeedFormatSize(int size) {
+        long fileSize = (long) size;
+        String showSize = "";
+        if (fileSize >= 0 && fileSize < 1024) {
+            showSize = fileSize + "Kb/s";
+        } else if (fileSize >= 1024 && fileSize < (1024 * 1024)) {
+            showSize = Long.toString(fileSize / 1024) + "KB/s";
+        } else if (fileSize >= (1024 * 1024) && fileSize < (1024 * 1024 * 1024)) {
+            showSize = Long.toString(fileSize / (1024 * 1024)) + "MB/s";
+        }
+        return showSize;
+    }
+
     public ITrackInfo[] getTrackInfo() {
         if (mMediaPlayer == null)
             return null;
@@ -1813,6 +1840,23 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         setViewVisible(rl_stream_list_container, visible);
     }
 
+    public void showSubscribeButton(CharSequence text) {
+        if (tv_subscribe != null) {
+            tv_subscribe.setText(text);
+            setViewVisible(tv_subscribe, true);
+        }
+    }
+
+    public void setSubscribeBtnClickListener(OnClickListener listener) {
+        if (tv_subscribe != null) {
+            tv_subscribe.setOnClickListener(listener);
+        }
+    }
+
+    public void hideSubscribeButton() {
+        setViewVisible(tv_subscribe, false);
+    }
+
     public void setTopFullscreenVisible(boolean visible) {
         setViewVisible(iv_top_fullscreen, visible);
     }
@@ -1854,8 +1898,15 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         }
     }
 
-    public void setLoadingDescriptionVisible(boolean visible) {
-        setViewVisible(tv_loading_description, visible);
+    public void showLoadingDescription(CharSequence description) {
+        if (tv_loading_description != null) {
+            tv_loading_description.setText(description);
+            setViewVisible(tv_loading_description, true);
+        }
+    }
+
+    public void hideLoadingDescription() {
+        setViewVisible(tv_loading_description, false);
     }
 
     private void setViewVisible(View view, boolean visible) {

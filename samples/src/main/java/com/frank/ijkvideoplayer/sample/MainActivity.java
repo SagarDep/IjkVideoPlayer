@@ -3,6 +3,7 @@ package com.frank.ijkvideoplayer.sample;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
 
 import com.frank.ijkvideoplayer.widget.media.IjkVideoStreamBean;
 import com.frank.ijkvideoplayer.widget.media.IjkVideoView;
@@ -15,6 +16,7 @@ import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 public class MainActivity extends AppCompatActivity {
 
     private IjkVideoView mVideoView;
+    private boolean mSubscribed;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,12 +32,12 @@ public class MainActivity extends AppCompatActivity {
         String url2 = "http://apl.youku.com/playlist/m3u8?vid=454701566&time=1479206476&ts=1479206476&ctype=12&token=2509&keyframe=0&sid=547920641881112285ee8&ev=1&type=hd2&ep=dyaTE0uNUMoB7SveiT8bZSTnISIHXPoP8hiFgNdkBtQmTei2&oip=2096835317";
         List<IjkVideoStreamBean> ijkVideoStreamBeanList = new ArrayList<>();
         IjkVideoStreamBean stream1 = new IjkVideoStreamBean();
-        stream1.setName("流畅");
+        stream1.setName(getString(R.string.hd_720));
         stream1.setUri(url1);
         stream1.setLive(false);
         ijkVideoStreamBeanList.add(stream1);
         IjkVideoStreamBean stream2 = new IjkVideoStreamBean();
-        stream2.setName("高清");
+        stream2.setName(getString(R.string.hd_1080));
         stream2.setUri(url2);
         stream2.setLive(true);
         ijkVideoStreamBeanList.add(stream2);
@@ -43,6 +45,18 @@ public class MainActivity extends AppCompatActivity {
         mVideoView.setVideoStream(ijkVideoStreamBeanList);
         mVideoView.setStreamListVisible(false);
         mVideoView.setTopFullscreenVisible(false);
+        mVideoView.showSubscribeButton(getString(R.string.subscribe));
+        mVideoView.setSubscribeBtnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mSubscribed = !mSubscribed;
+                if (mSubscribed) {
+                    mVideoView.showSubscribeButton(getString(R.string.unsubscribe));
+                } else {
+                    mVideoView.showSubscribeButton(getString(R.string.subscribe));
+                }
+            }
+        });
 //        mVideoView.setOnlyFullScreen(true);
         mVideoView.setOnOrientationChangedListener(new IjkVideoView.OnOrientationChangedListener() {
             @Override
