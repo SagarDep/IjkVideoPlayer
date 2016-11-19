@@ -30,7 +30,11 @@ import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
+import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -81,11 +85,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private static final int MSG_SHOW_PROGRESS = 2;
     private static final int MEDIA_CONTROLLER_TIMEOUT = 3000;
 
-    // settable by the client
     private Uri mUri;
     private Map<String, String> mHeaders;
 
-    // all possible internal states
     private static final int STATE_ERROR = -1;
     private static final int STATE_IDLE = 0;
     private static final int STATE_PREPARING = 1;
@@ -94,15 +96,14 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private static final int STATE_PAUSED = 4;
     private static final int STATE_PLAYBACK_COMPLETED = 5;
 
-    // mCurrentState is a VideoView object's current state.
-    // mTargetState is the state that a method caller intends to reach.
-    // For instance, regardless the VideoView object's current state,
-    // calling pause() intends to bring the object to a target state
-    // of STATE_PAUSED.
+    private final int TOUCH_STATE_NONE = -1;
+    private final int TOUCH_STATE_X = 0;
+    private final int TOUCH_STATE_Y = 1;
+
     private int mCurrentState = STATE_IDLE;
     private int mTargetState = STATE_IDLE;
+    private int mTouchState = TOUCH_STATE_NONE;
 
-    // All the stuff we need for playing and showing a video
     private IRenderView.ISurfaceHolder mSurfaceHolder = null;
     private IMediaPlayer mMediaPlayer = null;
     private int mVideoWidth;
@@ -115,15 +116,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private int mCurrentAspectRatio;
     private int mVideoRotationDegree;
     private int mCurrentBufferPercentage;
-    private int mSeekWhenPrepared;  // recording the seek position while preparing
-
-    /** Subtitle rendering widget overlaid on top of the video. */
-    // private RenderingWidget mSubtitleWidget;
-
-    /**
-     * Listener for changes to subtitle data, used to redraw when needed.
-     */
-    // private RenderingWidget.OnChangedListener mSubtitlesChangedListener;
+    private int mSeekWhenPrepared;
 
     private Context mAppContext;
     private Activity mActivity;
@@ -136,6 +129,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private long mPrepareEndTime = 0;
     private long mSeekStartTime = 0;
     private long mSeekEndTime = 0;
+    private long mSeekTime = 0;
 
     private IMediaPlayer.OnCompletionListener mOnCompletionListener;
     private IMediaPlayer.OnPreparedListener mOnPreparedListener;
@@ -834,24 +828,26 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 return;
             }
             long duration = getDuration();
-            long newPosition = (duration * progress) / 1000L;
-            seekTo((int) newPosition);
+            mSeekTime = (duration * progress) / 1000L;
             if (tv_current_time != null) {
-                tv_current_time.setText(stringForTime((int) newPosition));
+                tv_current_time.setText(stringForTime((int) mSeekTime));
             }
         }
 
         @Override
         public void onStopTrackingTouch(SeekBar bar) {
-            mMediaControllerDragging = false;
-            setMediaControllerProgress();
-            updatePausePlay();
-            showMediaController(MEDIA_CONTROLLER_TIMEOUT);
+            if (mMediaControllerDragging && mSeekTime > 0) {
+                seekTo((int) mSeekTime);
+                mMediaControllerDragging = false;
+                setMediaControllerProgress();
+                updatePausePlay();
+                showMediaController(MEDIA_CONTROLLER_TIMEOUT);
 
-            // Ensure that progress is properly updated in the future,
-            // the call to show() does not guarantee this because it is a
-            // no-op if we are already showing.
-            mHandler.sendEmptyMessage(MSG_SHOW_PROGRESS);
+                // Ensure that progress is properly updated in the future,
+                // the call to show() does not guarantee this because it is a
+                // no-op if we are already showing.
+                mHandler.sendEmptyMessage(MSG_SHOW_PROGRESS);
+            }
         }
     };
 
@@ -1282,6 +1278,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             case MotionEvent.ACTION_DOWN:
                 mInitialMotionY = event.getY();
                 mInitialMotionX = event.getX();
+                mTouchState = TOUCH_STATE_NONE;
                 break;
             case MotionEvent.ACTION_MOVE:
                 mMediaControllerDragging = true;
@@ -1296,21 +1293,35 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 diffX = mInitialMotionX - x;
                 absDiffX = Math.abs(diffX);
                 if (absDiffX > mTouchSlop && absDiffX > absDiffY) {
-                    if (!mLive) {
-                        onProgressSlide((-diffX / getWidth()));
+                    int position = getCurrentPosition();
+                    long duration = getDuration();
+                    long deltaMax = Math.min(100 * 1000, duration - position);
+                    long delta = (long) (deltaMax * (-diffX / getWidth()));
+                    mSeekTime = delta + position;
+                    if (mSeekTime > duration) {
+                        mSeekTime = duration;
+                    } else if (mSeekTime <= 0) {
+                        mSeekTime = 0;
                     }
-                    mMediaControllerDragging = false;
+                    onProgressSlide();
+                    mTouchState = TOUCH_STATE_X;
                 } else if (absDiffY > mTouchSlop) {
                     if (mInitialMotionX > windowWidth * 3.0 / 5) {
                         onVolumeSlide(diffY / windowHeight);
                     } else if (mInitialMotionX < windowWidth * 2.0 / 5) {
                         onBrightnessSlide(diffY / windowHeight);
                     }
+                    mTouchState = TOUCH_STATE_Y;
                 }
                 break;
 
             case MotionEvent.ACTION_UP:
                 mMediaControllerDragging = false;
+                if (mTouchState == TOUCH_STATE_X) {
+                    if (!mLive) {
+                        seekTo((int) mSeekTime);
+                    }
+                }
                 toggleMediaControllerVisibility();
                 setVolumeBrightnessVisible(false);
                 mVolume = -1;
@@ -1370,33 +1381,23 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         }
     }
 
-    private void onProgressSlide(float progress) {
-        int position = getCurrentPosition();
-        long duration = getDuration();
-        long deltaMax = Math.min(100 * 1000, duration - position);
-        long delta = (long) (deltaMax * progress);
-        long newPosition = delta + position;
-        if (newPosition > duration) {
-            newPosition = duration;
-        } else if (newPosition <= 0) {
-            newPosition = 0;
-            delta = -position;
-        }
-        int showDelta = (int) delta / 1000;
-        if (showDelta != 0 && sb_progress != null) {
-            if (newPosition >= 0) {
-                seekTo((int) newPosition);
-            }
+    private void onProgressSlide() {
+        long delta = mSeekTime - getCurrentPosition();
+        if (mSeekTime >= 0
+                && delta != 0
+                && sb_progress != null) {
             if (tv_current_time != null) {
-                tv_current_time.setText(stringForTime((int) newPosition));
+                tv_current_time.setText(stringForTime((int) mSeekTime));
             }
-            if (showDelta > 0) {
+            if (delta > 0) {
                 iv_volume_brightness.setImageResource(android.R.drawable.ic_media_ff);
-                tv_volume_brightness.setText("+" + " " + showDelta + " " + "s");
-            } else if (showDelta < 0) {
+            } else if (delta < 0) {
                 iv_volume_brightness.setImageResource(android.R.drawable.ic_media_rew);
-                tv_volume_brightness.setText(String.valueOf(showDelta) + " " + "s");
             }
+            SpannableStringBuilder seekTime = new SpannableStringBuilder(stringForTime((int) mSeekTime));
+            seekTime.setSpan(new ForegroundColorSpan(0xFFFF8800), 0, seekTime.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            seekTime.append(" / ").append(stringForTime(getDuration()));
+            tv_volume_brightness.setText(seekTime);
             setVolumeBrightnessVisible(true);
             setMediaControllerProgress();
             updatePausePlay();

@@ -92,12 +92,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
-        mVideoView.start();
-    }
-
-    @Override
     protected void onStop() {
         super.onStop();
         mVideoView.stop();
