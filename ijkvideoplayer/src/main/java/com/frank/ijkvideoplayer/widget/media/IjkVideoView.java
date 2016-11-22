@@ -304,6 +304,13 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mTargetState = STATE_IDLE;
     }
 
+    public void loadLibrary() {
+        // init player
+        IjkMediaPlayer.loadLibrariesOnce(null);
+        IjkMediaPlayer.native_profileBegin("libijkplayer.so");
+        IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_SILENT);
+    }
+
     public void destroy() {
         mOrientationEventListener.disable();
         if (!isBackgroundPlayEnabled()) {
@@ -1382,6 +1389,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     private void onProgressSlide() {
+        if (mLive) {
+            return;
+        }
         long delta = mSeekTime - getCurrentPosition();
         if (mSeekTime >= 0
                 && delta != 0
@@ -1511,6 +1521,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         if (isPlaying()) {
             stop();
         } else {
+            if (mCurrentState == STATE_PLAYBACK_COMPLETED) {
+                showMediaController(MEDIA_CONTROLLER_TIMEOUT);
+            }
             start();
         }
         updatePausePlay();
@@ -1607,6 +1620,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             }
         }
         if (isInPlaybackState()) {
+            log("mMediaPlayer.start()");
             mMediaPlayer.start();
             mCurrentState = STATE_PLAYING;
         }
@@ -1625,6 +1639,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void replay() {
+        mCurrentState = STATE_PLAYBACK_COMPLETED;
         hideLoadingDescription();
         setLoadingContainerVisible(true);
         if (mLive) {

@@ -5,8 +5,8 @@ android {
     buildToolsVersion "25.0.0"
     defaultConfig {
         applicationId "com.frank.ijkvideoplayer.sample"
-        minSdkVersion 12
-        targetSdkVersion 23
+        minSdkVersion 11
+        targetSdkVersion 22
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
