@@ -41,6 +41,7 @@ public class Settings {
 
     private SharedPreferences mSharedPreferences;
     private boolean mEnableLogging = true;
+    private boolean mEnableStorePlaybackProgress = false;
 
     public Settings(Context context) {
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -260,6 +261,46 @@ public class Settings {
      */
     public void setEnableLogging(boolean enableLogging) {
         this.mEnableLogging = enableLogging;
+    }
+
+    /**
+     * 是否保存播放进度
+     *
+     * @return true保存，false不保存
+     */
+    public boolean getEnableStorePlaybackProgress() {
+        return mEnableStorePlaybackProgress;
+    }
+
+    /**
+     * 设置是否保存播放进度
+     *
+     * @param enableStorePlaybackProgress true保存，false不保存
+     */
+    public void setEnableStorePlaybackProgress(boolean enableStorePlaybackProgress) {
+        this.mEnableStorePlaybackProgress = enableStorePlaybackProgress;
+    }
+
+    /**
+     * 查找上次播放进度
+     *
+     * @param cacheKey Cache key
+     * @return 上一次播放进度
+     */
+    public long getLastPosition(String cacheKey) {
+        return mSharedPreferences.getLong(cacheKey, 0L);
+    }
+
+    /**
+     * 保存播放进度
+     *
+     * @param cacheKey     Cache key
+     * @param lastPosition 上一次播放进度
+     */
+    public void setLastPosition(String cacheKey, long lastPosition) {
+        mSharedPreferences.edit()
+                .putLong(cacheKey, lastPosition)
+                .apply();
     }
 
 }

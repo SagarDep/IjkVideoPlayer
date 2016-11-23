@@ -140,6 +140,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     private boolean mEnableBackgroundPlay;
     private boolean mEnableLogging;
+    private boolean mEnableStorePlaybackProgress;
     private boolean mForceFullScreen;
     private boolean mForcePortrait;
     private boolean mLockRotation;
@@ -236,6 +237,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mAppContext = mActivity.getApplicationContext();
         mSettings = new Settings(mAppContext);
         mEnableLogging = mSettings.getEnableLogging();
+        mEnableStorePlaybackProgress = mSettings.getEnableStorePlaybackProgress();
         mCurrentAspectRatio = Settings.LAYOUT_FILL_PARENT;
         mScreenWidth = mActivity.getResources().getDisplayMetrics().widthPixels;
         mScreenHeight = mActivity.getResources().getDisplayMetrics().heightPixels;
@@ -613,21 +615,14 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
      * @param streamList 视频流列表，需要设置name(名字),url(路径),isLive(是否是直播)
      */
     public void setVideoStream(List<IjkVideoStreamBean> streamList) {
+        setVideoStream(streamList, null);
+    }
+
+    public void setVideoStream(List<IjkVideoStreamBean> streamList, Map<String, String> headers) {
+        mHeaders = headers;
         mIjkVideoStreamList.clear();
         if (streamList != null) {
             mIjkVideoStreamList.addAll(streamList);
-            switchStream(0);
-            updateStreamList();
-        }
-    }
-
-    /**
-     * 设置视频流，需要设置name(名字),url(路径),isLive(是否是直播)
-     */
-    public void setVideoStream(IjkVideoStreamBean stream) {
-        mIjkVideoStreamList.clear();
-        if (stream != null) {
-            mIjkVideoStreamList.add(stream);
             switchStream(0);
             updateStreamList();
         }
@@ -646,10 +641,15 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mCurrentPosition = getCurrentPosition();
         mUri = Uri.parse(ijkVideoStreamBean.getUri());
         mLive = ijkVideoStreamBean.isLive();
+        mSeekWhenPrepared = 0;
+        openVideo();
+        requestLayout();
+        invalidate();
         if (mLive) {
             setSeekBarVisible(false);
         } else {
             setSeekBarVisible(true);
+            mSeekWhenPrepared = mCurrentPosition;
         }
     }
 
@@ -678,12 +678,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         switchStream(position);
                         showLoadingDescription(getResources().getString(R.string.streams_switching));
                         setLoadingContainerVisible(true);
-                        if (mLive) {
-                            setVideoURI(mUri, true);
-                        } else {
-                            setVideoURI(mUri, false);
-                            seekTo(mCurrentPosition);
-                        }
                         updateStreamListState();
                         start();
                     }
@@ -759,6 +753,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 
         try {
+            log("createPlayer:" + mSettings.getPlayer());
             mMediaPlayer = createPlayer(mSettings.getPlayer());
 
             // TODO: create SubtitleController in MediaPlayer, but we need
@@ -1278,16 +1273,21 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 toggleMediaControllerVisibility();
             }
         }
-        if (keyCode == KeyEvent.KEYCODE_BACK
-                && !mOnlyFullScreen
-                && (getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                || getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE)) {
-            mForcePortrait = true;
-            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-            if (mOnOrientationChangedListener != null) {
-                mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (!mOnlyFullScreen
+                    && (getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                    || getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE)) {
+                mForcePortrait = true;
+                mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                if (mOnOrientationChangedListener != null) {
+                    mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                }
+                return true;
+            } else {
+                if (mEnableStorePlaybackProgress && !mLive && mUri != null) {
+                    mSettings.setLastPosition(mUri.toString(), getCurrentPosition());
+                }
             }
-            return true;
         }
         return super.onKeyDown(keyCode, event);
     }
@@ -1451,6 +1451,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                     mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
                 }
             } else {
+                if (mEnableStorePlaybackProgress && !mLive && mUri != null) {
+                    mSettings.setLastPosition(mUri.toString(), getCurrentPosition());
+                }
                 mActivity.onBackPressed();
             }
         } else if (viewId == R.id.iv_top_fullscreen || viewId == R.id.iv_bottom_fullscreen) {
@@ -1479,6 +1482,15 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             if (mOnOrientationChangedListener != null) {
                 mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             }
+        }
+        updateFullScreenButton();
+    }
+
+    public void initFullScreen() {
+        mForceFullScreen = true;
+        mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        if (mOnOrientationChangedListener != null) {
+            mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         }
         updateFullScreenButton();
     }
@@ -1634,6 +1646,15 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         } else {
             showMediaController();
         }
+    }
+
+    public void startFromLastPosition() {
+        mCurrentState = STATE_PREPARED;
+        mEnableStorePlaybackProgress = true;
+        if (isInPlaybackState() && !mLive && mUri != null) {
+            mSeekWhenPrepared = (int) mSettings.getLastPosition(mUri.toString());
+        }
+        start();
     }
 
     public void start() {
