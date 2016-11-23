@@ -48,6 +48,7 @@ import android.view.Surface;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -333,15 +334,24 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             @Override
             public void run() {
                 toggleWindowFlags(!portrait);
-                if (portrait) {
-                    ViewGroup.LayoutParams layoutParams = getLayoutParams();
-                    layoutParams.height = mVideoInitHeight;
-                    setLayoutParams(layoutParams);
-                } else {
-                    ViewGroup.LayoutParams layoutParams = getLayoutParams();
-                    layoutParams.height = Math.min(mScreenWidth, mScreenHeight);
-                    setLayoutParams(layoutParams);
+                ViewParent viewParent = getParent();
+                if (viewParent instanceof ViewGroup) {
+                    ViewGroup container = ((ViewGroup) viewParent);
+                    ViewGroup.LayoutParams layoutParams = container.getLayoutParams();
+                    if (portrait) {
+                        layoutParams.height = mVideoInitHeight;
+                    } else {
+                        layoutParams.height = Math.min(mScreenWidth, mScreenHeight);
+                    }
+                    container.setLayoutParams(layoutParams);
                 }
+                ViewGroup.LayoutParams layoutParams = getLayoutParams();
+                if (portrait) {
+                    layoutParams.height = mVideoInitHeight;
+                } else {
+                    layoutParams.height = Math.min(mScreenWidth, mScreenHeight);
+                }
+                setLayoutParams(layoutParams);
                 updateFullScreenButton();
             }
         });
