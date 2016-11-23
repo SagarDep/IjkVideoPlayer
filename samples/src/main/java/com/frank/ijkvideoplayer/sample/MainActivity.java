@@ -1,6 +1,11 @@
 package com.frank.ijkvideoplayer.sample;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
+import android.net.ConnectivityManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -12,8 +17,6 @@ import com.frank.ijkvideoplayer.widget.media.IjkVideoView;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -98,6 +101,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (mNetWorkStateReceiver != null) {
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+            registerReceiver(mNetWorkStateReceiver, filter);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mNetWorkStateReceiver != null) {
+            unregisterReceiver(mNetWorkStateReceiver);
+        }
+    }
+
+    @Override
     protected void onStop() {
         super.onStop();
         mVideoView.stop();
@@ -108,4 +129,16 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         mVideoView.destroy();
     }
+
+    private NetWorkStateReceiver mNetWorkStateReceiver = new NetWorkStateReceiver();
+
+    class NetWorkStateReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (mVideoView != null) {
+                mVideoView.networkPrompt();
+            }
+        }
+    }
+
 }

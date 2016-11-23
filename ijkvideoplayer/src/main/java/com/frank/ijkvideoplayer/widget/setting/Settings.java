@@ -26,6 +26,8 @@ public class Settings {
     public static final String OVERLAY_FORMAT_YV12 = "fcc-yv12";
     public static final String OVERLAY_FORMAT_OpenGL_ES2 = "fcc-_es2";
 
+    public static final int ERROR_WIFI_DISCONNECTED = 20001;
+
     public static final String PLAYER_KEY = "ijk_video_player_player";
     public static final String RENDER_KEY = "ijk_video_player_render";
     public static final String USING_MEDIA_DATA_SOURCE_KEY = "ijk_video_player_using_media_data_source";

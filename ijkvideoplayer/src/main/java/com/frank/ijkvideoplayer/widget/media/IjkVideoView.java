@@ -22,7 +22,8 @@ import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -30,7 +31,6 @@ import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
-import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -147,6 +147,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private boolean mMediaControllerShowing;
     private boolean mMediaControllerDragging;
     private boolean mLive;
+    private boolean mPrompted;
     private int mTouchSlop;
     private float mInitialMotionX;
     private float mInitialMotionY;
@@ -320,7 +321,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         } else {
             enterBackground();
         }
-        IjkMediaPlayer.native_profileEnd();
     }
 
     @Override
@@ -471,6 +471,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
      * @param timeout 显示媒体控制器的时间，如果为0则一直显示
      */
     public void showMediaController(int timeout) {
+        if (mMediaPlayer == null) {
+            return;
+        }
         if (!mMediaControllerShowing) {
             setMediaControllerProgress();
             if (iv_pause != null) {
@@ -800,7 +803,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             log("Unable to open content: " + mUri);
             mCurrentState = STATE_ERROR;
             mTargetState = STATE_ERROR;
-            mErrorListener.onError(mMediaPlayer, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0);
+            mErrorListener.onError(mMediaPlayer, IMediaPlayer.MEDIA_INFO_UNKNOWN, 0);
         }
     }
 
@@ -862,6 +865,13 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         @Override
         public void onClick(View v) {
             replay();
+        }
+    };
+
+    private OnClickListener mContinueClickListener = new OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            continuePlay();
         }
     };
 
@@ -1021,6 +1031,13 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                             setLoadingContainerVisible(false);
                             setErrorContainerVisible(false);
                             break;
+                        case Settings.ERROR_WIFI_DISCONNECTED: // 无WIFI连接
+                            log("no WIFI");
+                            tv_error_message.setText(getResources().getString(R.string.error_wifi_disconnected));
+                            btn_error_action.setText(getResources().getString(R.string.continue_play));
+                            btn_error_action.setOnClickListener(mContinueClickListener);
+                            setErrorContainerVisible(true);
+                            break;
                     }
                     return true;
                 }
@@ -1063,6 +1080,11 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                             btn_error_action.setText(getResources().getString(R.string.retrieve));
                             btn_error_action.setOnClickListener(mReplayClickListener);
                             setErrorContainerVisible(true);
+                            break;
+                    }
+                    switch (impl_err) {
+                        default:
+                            log("implementation error:" + impl_err);
                             break;
                     }
                     return true;
@@ -1540,6 +1562,11 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         } else {
             iv_pause.setImageResource(R.drawable.ic_play);
         }
+        if (mCurrentState == STATE_ERROR) {
+            setViewVisible(iv_pause, false);
+        } else {
+            setViewVisible(iv_pause, true);
+        }
     }
 
     public int getScreenOrientation() {
@@ -1610,6 +1637,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void start() {
+        if (!mPrompted && networkPrompt()) {
+            return;
+        }
         if (mOnlyFullScreen
                 && (getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 || getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT)) {
@@ -1638,6 +1668,12 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mTargetState = STATE_PAUSED;
     }
 
+    public void continuePlay() {
+        mCurrentState = STATE_PAUSED;
+        setErrorContainerVisible(false);
+        start();
+    }
+
     public void replay() {
         mCurrentState = STATE_PLAYBACK_COMPLETED;
         hideLoadingDescription();
@@ -1649,6 +1685,33 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             seekTo(mCurrentPosition);
         }
         start();
+    }
+
+    public void onWIFIDisconnected() {
+        mCurrentState = STATE_ERROR;
+        mTargetState = STATE_ERROR;
+        if (mInfoListener != null) {
+            mInfoListener.onInfo(mMediaPlayer, Settings.ERROR_WIFI_DISCONNECTED, getCurrentPosition());
+            mPrompted = true;
+        }
+        if (mMediaPlayer != null) {
+            if (mMediaPlayer.isPlaying()) {
+                mMediaPlayer.pause();
+            }
+        }
+    }
+
+    public boolean networkPrompt() {
+        boolean prompt = false;
+        ConnectivityManager connectivityManager = (ConnectivityManager) mActivity.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        if (activeNetworkInfo != null) {
+            if (activeNetworkInfo.getType() != ConnectivityManager.TYPE_WIFI || !activeNetworkInfo.isConnected()) {
+                prompt = true;
+                onWIFIDisconnected();
+            }
+        }
+        return prompt;
     }
 
     public int getDuration() {

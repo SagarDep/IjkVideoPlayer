@@ -6,4 +6,6 @@
     <string name="error_unknown">未知错误</string>
     <string name="error_interrupt">连接中断</string>
     <string name="error_timeout">请求超时</string>
+    <string name="error_wifi_disconnected">WIFI连接中断</string>
+    <string name="continue_play">继续播放</string>
 </resources>
