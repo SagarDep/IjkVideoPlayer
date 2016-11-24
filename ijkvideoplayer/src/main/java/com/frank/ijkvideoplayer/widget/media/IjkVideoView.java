@@ -1286,19 +1286,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             }
         }
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (!mOnlyFullScreen
-                    && (getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                    || getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE)) {
-                mForcePortrait = true;
-                setRequestedActivityOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                if (mOnOrientationChangedListener != null) {
-                    mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-                }
+            if (iv_back != null) {
+                iv_back.performClick();
                 return true;
-            } else {
-                if (mEnableStorePlaybackProgress && !mLive && mUri != null) {
-                    mSettings.setLastPosition(mUri.toString(), getCurrentPosition());
-                }
             }
         }
         return super.onKeyDown(keyCode, event);
@@ -2075,6 +2065,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     public void setOrientationEventListener(OrientationEventListener orientationEventListener) {
         this.mOrientationEventListener = orientationEventListener;
+        lockRotation(false);
     }
 
     public OnOrientationChangedListener getOnOrientationChangedListener() {
