@@ -878,6 +878,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     private OnClickListener mContinueClickListener = new OnClickListener() {
         @Override
         public void onClick(View v) {
+            mPrompted = true;
+            log(" has Prompted");
             continuePlay();
         }
     };
@@ -1043,6 +1045,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                             tv_error_message.setText(getResources().getString(R.string.error_wifi_disconnected));
                             btn_error_action.setText(getResources().getString(R.string.continue_play));
                             btn_error_action.setOnClickListener(mContinueClickListener);
+                            setLoadingContainerVisible(false);
                             setErrorContainerVisible(true);
                             break;
                     }
@@ -1668,9 +1671,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void start() {
-        if (!mPrompted && networkPrompt()) {
-            return;
-        }
         if (mOnlyFullScreen
                 && (getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                 || getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT)) {
@@ -1679,6 +1679,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             if (mOnOrientationChangedListener != null) {
                 mOnOrientationChangedListener.onOrientationChanged(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
             }
+        }
+        if (!mPrompted && networkPrompt()) {
+            return;
         }
         if (isInPlaybackState()) {
             log("mMediaPlayer.start()");
@@ -1723,7 +1726,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mTargetState = STATE_ERROR;
         if (mInfoListener != null) {
             mInfoListener.onInfo(mMediaPlayer, Settings.ERROR_WIFI_DISCONNECTED, getCurrentPosition());
-            mPrompted = true;
         }
         if (mMediaPlayer != null) {
             if (mMediaPlayer.isPlaying()) {
@@ -1739,6 +1741,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         if (activeNetworkInfo != null) {
             if (activeNetworkInfo.getType() != ConnectivityManager.TYPE_WIFI || !activeNetworkInfo.isConnected()) {
                 prompt = true;
+                log("onWIFIDisconnected");
                 onWIFIDisconnected();
             }
         }

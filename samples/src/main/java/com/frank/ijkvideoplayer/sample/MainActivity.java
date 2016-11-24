@@ -95,7 +95,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 });
-                mVideoView.start();
+                mVideoView.startFromLastPosition();
+                mVideoView.initFullScreen();
             }
         });
     }
