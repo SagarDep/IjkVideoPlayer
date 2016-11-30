@@ -266,48 +266,65 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         initControlPanel();
         initMediaController();
 
-        setOrientationEventListener(new OrientationEventListener(mActivity) {
-            @Override
-            public void onOrientationChanged(int orientation) {
-                if (mLockRotation
-                        || orientation == OrientationEventListener.ORIENTATION_UNKNOWN) {
-                    return;
-                }
-                int requestOrientation;
-                if (!mForceFullScreen && (((orientation >= 0) && (orientation <= 45)) || (orientation > 315))) {
-                    mForcePortrait = false;
-                    requestOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-                } else if (!mForcePortrait && (orientation > 45) && (orientation <= 135)) {
-                    mForceFullScreen = false;
-                    requestOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
-                } else if (!mForceFullScreen && ((orientation > 135) && (orientation <= 225))) {
-                    mForcePortrait = false;
-                    requestOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT;
-                } else if (!mForcePortrait && (orientation > 225) && (orientation <= 315)) {
-                    mForceFullScreen = false;
-                    requestOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
-                } else {
-                    requestOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
-                }
-                final boolean portrait = (requestOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                        || requestOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT);
-                if (!mForceFullScreen && !mForcePortrait && (!mOnlyFullScreen || !portrait)) {
-                    if (mOnOrientationChangedListener != null && requestOrientation != getScreenOrientation()) {
-                        mOnOrientationChangedListener.onOrientationChanged(requestOrientation);
+        if (!mActivity.toString().equals(Settings.getCurrentActivityKey())) {
+            Settings.setCurrentActivityKey(mActivity.toString());
+            mOrientationEventListener = new OrientationEventListener(mActivity) {
+                @Override
+                public void onOrientationChanged(int orientation) {
+                    if (mLockRotation
+                            || orientation == OrientationEventListener.ORIENTATION_UNKNOWN) {
+                        return;
                     }
-                    setRequestedActivityOrientation(requestOrientation);
+                    int currentOrientation = getScreenOrientation();
+                    int requestOrientation;
+                    if ((((orientation >= 0) && (orientation <= 45)) || (orientation > 315))) {
+                        requestOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                    } else if ((orientation > 45) && (orientation <= 135)) {
+                        requestOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+                    } else if (((orientation > 135) && (orientation <= 225))) {
+                        requestOrientation = ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT;
+                    } else if ((orientation > 225) && (orientation <= 315)) {
+                        requestOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+                    } else {
+                        requestOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+                    }
+                    final boolean portrait = (requestOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            || requestOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT);
+                    if (mForceFullScreen
+                            && requestOrientation != ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                            && requestOrientation != ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
+                        mForceFullScreen = false;
+                    }
+                    if (mForcePortrait
+                            && requestOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT) {
+                        mForcePortrait = false;
+                    }
+                    if (!mForceFullScreen
+                            && !mForcePortrait
+                            && (!mOnlyFullScreen || !portrait)
+                            && currentOrientation != requestOrientation) {
+                        if (mOnOrientationChangedListener != null) {
+                            mOnOrientationChangedListener.onOrientationChanged(requestOrientation);
+                        }
+                        setRequestedActivityOrientation(requestOrientation);
+                    }
                 }
-            }
-        });
+            };
+            mOrientationEventListener.enable();
+        }
+
         int initOrientation = getScreenOrientation();
-        toggleWindowFlags(initOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || initOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
-        // REMOVED: getHolder().addCallback(mSHCallback);
-        // REMOVED: getHolder().setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        boolean initFullScreen = initOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || initOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE;
+        if (initFullScreen && mVideoInitHeight <= 0) {
+            mVideoInitHeight = Math.max(mScreenWidth, mScreenHeight);
+        }
+        toggleWindowFlags(initFullScreen);
+
         setFocusable(true);
         setFocusableInTouchMode(true);
         requestFocus();
         setOnTouchListener(this);
-        // REMOVED: mPendingSubtitleTracks = new Vector<Pair<InputStream, MediaFormat>>();
+
         mCurrentState = STATE_IDLE;
         mTargetState = STATE_IDLE;
     }
@@ -1965,8 +1982,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     private void setRequestedActivityOrientation(int requestedOrientation) {
         if (mActivity != null) {
-            int currentOrientation = getScreenOrientation();
-            if (currentOrientation != requestedOrientation) {
+            if (getScreenOrientation() != requestedOrientation) {
                 mActivity.setRequestedOrientation(requestedOrientation);
             }
         }
@@ -2100,11 +2116,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     public OrientationEventListener getOrientationEventListener() {
         return mOrientationEventListener;
-    }
-
-    public void setOrientationEventListener(OrientationEventListener orientationEventListener) {
-        this.mOrientationEventListener = orientationEventListener;
-        lockRotation(false);
     }
 
     public OnOrientationChangedListener getOnOrientationChangedListener() {

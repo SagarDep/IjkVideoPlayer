@@ -42,6 +42,7 @@ public class Settings {
     private SharedPreferences mSharedPreferences;
     private boolean mEnableLogging = true;
     private boolean mEnableStorePlaybackProgress = false;
+    private static String mCurrentActivityKey;
 
     public Settings(Context context) {
         mSharedPreferences = PreferenceManager.getDefaultSharedPreferences(context);
@@ -303,4 +304,11 @@ public class Settings {
                 .apply();
     }
 
+    public static String getCurrentActivityKey() {
+        return mCurrentActivityKey;
+    }
+
+    public static void setCurrentActivityKey(String currentActivityKey) {
+        Settings.mCurrentActivityKey = currentActivityKey;
+    }
 }
