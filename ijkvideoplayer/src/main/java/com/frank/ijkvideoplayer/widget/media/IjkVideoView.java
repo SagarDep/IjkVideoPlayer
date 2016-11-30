@@ -244,16 +244,19 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         mScreenHeight = mActivity.getResources().getDisplayMetrics().heightPixels;
         mVideoWidth = 0;
         mVideoHeight = 0;
-        ViewTreeObserver viewTreeObserver = getViewTreeObserver();
-        viewTreeObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-                if (mVideoInitHeight <= 0 && getHeight() > 0) {
-                    mVideoInitHeight = getHeight();
-                    getViewTreeObserver().removeGlobalOnLayoutListener(this);
+        mVideoInitHeight = getViewHeight(this);
+        if (mVideoInitHeight <= 0) {
+            ViewTreeObserver viewTreeObserver = getViewTreeObserver();
+            viewTreeObserver.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    if (mVideoInitHeight <= 0 && getHeight() > 0) {
+                        mVideoInitHeight = getHeight();
+                        getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                    }
                 }
-            }
-        });
+            });
+        }
         mTouchSlop = ViewConfiguration.get(mActivity).getScaledTouchSlop();
         mAudioManager = (AudioManager) mAppContext.getSystemService(Context.AUDIO_SERVICE);
         mMaxVolume = mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
@@ -289,14 +292,15 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 final boolean portrait = (requestOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                         || requestOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT);
                 if (!mForceFullScreen && !mForcePortrait && (!mOnlyFullScreen || !portrait)) {
-                    setRequestedActivityOrientation(requestOrientation);
-                    if (mOnOrientationChangedListener != null) {
+                    if (mOnOrientationChangedListener != null && requestOrientation != getScreenOrientation()) {
                         mOnOrientationChangedListener.onOrientationChanged(requestOrientation);
                     }
+                    setRequestedActivityOrientation(requestOrientation);
                 }
             }
         });
-
+        int initOrientation = getScreenOrientation();
+        toggleWindowFlags(initOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || initOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE);
         // REMOVED: getHolder().addCallback(mSHCallback);
         // REMOVED: getHolder().setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         setFocusable(true);
@@ -1512,6 +1516,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     private void toggleWindowFlags(boolean fullScreen) {
+        if (mActivity == null) {
+            return;
+        }
         if (mActivity instanceof AppCompatActivity) {
             ActionBar supportActionBar = ((AppCompatActivity) mActivity).getSupportActionBar();
             if (supportActionBar != null) {
@@ -1527,10 +1534,25 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             attrs.flags |= WindowManager.LayoutParams.FLAG_FULLSCREEN;
             mActivity.getWindow().setAttributes(attrs);
             mActivity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                View decorView = mActivity.getWindow().getDecorView();
+                decorView.setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            }
         } else {
             attrs.flags &= (~WindowManager.LayoutParams.FLAG_FULLSCREEN);
             mActivity.getWindow().setAttributes(attrs);
             mActivity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                View decorView = mActivity.getWindow().getDecorView();
+                decorView.setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_VISIBLE);
+            }
         }
     }
 
@@ -1924,6 +1946,17 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         return MediaPlayerCompat.getSelectedTrack(mMediaPlayer, trackType);
     }
 
+    public static int getViewHeight(View view) {
+        if (view.getHeight() > 0) {
+            return view.getHeight();
+        } else if (view.getLayoutParams() != null && view.getLayoutParams().height > 0) {
+            return view.getLayoutParams().height;
+        } else {
+            view.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            return view.getMeasuredHeight();
+        }
+    }
+
     private void log(String message) {
         if (mEnableLogging) {
             Log.d(TAG, message);
@@ -1932,7 +1965,10 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     private void setRequestedActivityOrientation(int requestedOrientation) {
         if (mActivity != null) {
-            mActivity.setRequestedOrientation(requestedOrientation);
+            int currentOrientation = getScreenOrientation();
+            if (currentOrientation != requestedOrientation) {
+                mActivity.setRequestedOrientation(requestedOrientation);
+            }
         }
     }
 
