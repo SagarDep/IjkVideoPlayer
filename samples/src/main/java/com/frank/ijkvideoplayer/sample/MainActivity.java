@@ -30,7 +30,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         mVideoView = (IjkVideoView) findViewById(R.id.video_view);
         btn_1 = (Button) findViewById(R.id.btn_1);
-        mVideoView.lockRotation(true);
         btn_1.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -49,7 +48,6 @@ public class MainActivity extends AppCompatActivity {
                 stream2.setLive(true);
                 ijkVideoStreamBeanList.add(stream2);
                 mVideoView.loadLibrary();
-                mVideoView.lockRotation(false);
                 mVideoView.setTitle(getString(R.string.app_name));
                 mVideoView.setVideoStream(ijkVideoStreamBeanList);
                 mVideoView.setStreamListVisible(false);
@@ -66,7 +64,6 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 });
-//        mVideoView.setOnlyFullScreen(true);
                 mVideoView.setOnOrientationChangedListener(new IjkVideoView.OnOrientationChangedListener() {
                     @Override
                     public void onOrientationChanged(int orientation) {

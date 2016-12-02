@@ -228,11 +228,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         initVideoView();
     }
 
-    // REMOVED: onMeasure
-    // REMOVED: onInitializeAccessibilityEvent
-    // REMOVED: onInitializeAccessibilityNodeInfo
-    // REMOVED: resolveAdjustedSize
-
     private void initVideoView() {
 
         mAppContext = mActivity.getApplicationContext();
@@ -310,7 +305,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                     }
                 }
             };
-            mOrientationEventListener.enable();
         }
 
         int initOrientation = getScreenOrientation();
@@ -337,9 +331,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void destroy() {
-        if (mOrientationEventListener != null) {
-            mOrientationEventListener.disable();
-        }
+        setAccelerometerEnable(false);
         if (!isBackgroundPlayEnabled()) {
             stopPlayback();
             release(true);
@@ -1493,8 +1485,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     public void toggleFullScreen() {
         if (mLockRotation) {
-            return;
+            lockRotation(false);
         }
+        setAccelerometerEnable(true);
         if (getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 || getScreenOrientation() == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
             mForcePortrait = true;
@@ -1580,15 +1573,26 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     public void lockRotation(boolean isLock) {
         mLockRotation = isLock;
         if (mLockRotation) {
-            if (mOrientationEventListener != null) {
-                mOrientationEventListener.disable();
-            }
+            setAccelerometerEnable(false);
         } else {
-            if (mOrientationEventListener != null) {
-                mOrientationEventListener.enable();
-            }
+            setAccelerometerEnable(true);
         }
         updateLockRotationButton();
+    }
+
+    /**
+     * 是否启用方向传感器监听，默认禁用
+     *
+     * @param enable true启用，会根据设备当前的方向改变布局，false禁用传感器
+     */
+    public void setAccelerometerEnable(boolean enable) {
+        if (mOrientationEventListener != null) {
+            if (enable) {
+                mOrientationEventListener.enable();
+            } else {
+                mOrientationEventListener.disable();
+            }
+        }
     }
 
     private void updateLockRotationButton() {
