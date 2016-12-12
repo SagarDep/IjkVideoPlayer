@@ -64,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 });
+                mVideoView.setAccelerometerEnable(true);
                 mVideoView.setOnOrientationChangedListener(new IjkVideoView.OnOrientationChangedListener() {
                     @Override
                     public void onOrientationChanged(int orientation) {
@@ -80,7 +81,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
                 mVideoView.startFromLastPosition();
-                mVideoView.initFullScreen();
             }
         });
     }

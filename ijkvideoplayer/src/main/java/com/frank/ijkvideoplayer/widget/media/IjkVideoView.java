@@ -301,6 +301,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                         if (mOnOrientationChangedListener != null) {
                             mOnOrientationChangedListener.onOrientationChanged(requestOrientation);
                         }
+                        log("sensor setRequestedActivityOrientation:" + requestOrientation);
                         setRequestedActivityOrientation(requestOrientation);
                     }
                 }
@@ -687,7 +688,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             IjkVideoStreamBean ijkVideoStreamBean = mIjkVideoStreamList.get(i);
             ijkVideoStreamBean.setIndex(i);
             TextView textView = new TextView(mActivity);
-            textView.setTextSize(8);
+            textView.setTextSize(12);
             textView.setGravity(Gravity.CENTER);
             textView.setTag(ijkVideoStreamBean);
             textView.setOnClickListener(new View.OnClickListener() {
@@ -709,8 +710,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
                 }
             });
             RelativeLayout.LayoutParams relativeLayoutparams = new RelativeLayout.LayoutParams(
-                    MeasureHelper.dp2px(mActivity, 30), MeasureHelper.dp2px(mActivity, 20));
-            relativeLayoutparams.rightMargin = MeasureHelper.dp2px(mActivity, i * 40);
+                    MeasureHelper.dp2px(mActivity, 40), MeasureHelper.dp2px(mActivity, 20));
+            relativeLayoutparams.rightMargin = MeasureHelper.dp2px(mActivity, i * 45);
             relativeLayoutparams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT, RelativeLayout.TRUE);
             relativeLayoutparams.addRule(RelativeLayout.CENTER_VERTICAL, RelativeLayout.TRUE);
             rl_stream_list_container.addView(textView, relativeLayoutparams);
@@ -740,13 +741,13 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     public void addSubscribeButton(int index) {
         tv_subscribe = new TextView(mActivity);
         tv_subscribe.setTextColor(0xFFFFFFFF);
-        tv_subscribe.setTextSize(8);
+        tv_subscribe.setTextSize(12);
         tv_subscribe.setGravity(Gravity.CENTER);
         tv_subscribe.setBackgroundDrawable(mActivity.getResources().getDrawable(R.drawable.ijk_video_player_round_corner_white));
         tv_subscribe.setVisibility(GONE);
         RelativeLayout.LayoutParams relativeLayoutparams = new RelativeLayout.LayoutParams(
-                MeasureHelper.dp2px(mActivity, 40), MeasureHelper.dp2px(mActivity, 20));
-        relativeLayoutparams.rightMargin = MeasureHelper.dp2px(mActivity, index * 40);
+                MeasureHelper.dp2px(mActivity, 55), MeasureHelper.dp2px(mActivity, 20));
+        relativeLayoutparams.rightMargin = MeasureHelper.dp2px(mActivity, index * 45);
         relativeLayoutparams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT, RelativeLayout.TRUE);
         relativeLayoutparams.addRule(RelativeLayout.CENTER_VERTICAL, RelativeLayout.TRUE);
         rl_stream_list_container.addView(tv_subscribe, relativeLayoutparams);
@@ -1561,7 +1562,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                 View decorView = mActivity.getWindow().getDecorView();
                 decorView.setSystemUiVisibility(
-                        View.SYSTEM_UI_FLAG_VISIBLE);
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
             }
         }
     }
@@ -1588,6 +1591,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     public void setAccelerometerEnable(boolean enable) {
         if (mOrientationEventListener != null) {
             if (enable) {
+                log("mOrientationEventListener.enable()");
                 mOrientationEventListener.enable();
             } else {
                 mOrientationEventListener.disable();
