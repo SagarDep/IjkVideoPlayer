@@ -40,7 +40,7 @@ public class Settings {
     public static final String ENABLE_BACKGROUND_PLAY_KEY = "ijk_video_player_enable_background_play";
 
     private SharedPreferences mSharedPreferences;
-    private boolean mEnableLogging = true;
+    private boolean mEnableLogging = false;
     private boolean mEnableStorePlaybackProgress = false;
     private static String mCurrentActivityKey;
 

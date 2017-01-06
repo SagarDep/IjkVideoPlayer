@@ -36,10 +36,11 @@ public class MainActivity extends AppCompatActivity {
                 String url1 = "http://9890.vod.myqcloud.com/9890_4e292f9a3dd011e6b4078980237cc3d3.f30.mp4";
                 String url2 = "http://pl.youku.com/playlist/m3u8?vid=454701566&time=1479206476&ts=1479206476&ctype=12&token=2509&keyframe=0&sid=547920641881112285ee8&ev=1&type=hd2&ep=dyaTE0uNUMoB7SveiT8bZSTnISIHXPoP8hiFgNdkBtQmTei2&oip=2096835317";
                 String url3 = "https://csgostash.com/video/skins/mp4/s274.mp4";
+                String url4 = "http://pl.youku.com/playlist/m3u8?vid=475403749&time=1483618613&ts=1483618613&ctype=12&token=0514&keyframe=0&sid=048361852903212c9542e&ev=1&type=hd3&ep=ciacGU%2BMXssC7CPcij8bNCXncHVaXJZ0vESH%2F7YbAMZuNaHQmTvQww%3D%3D&oip=2096835320";
                 List<IjkVideoStreamBean> ijkVideoStreamBeanList = new ArrayList<>();
                 IjkVideoStreamBean stream1 = new IjkVideoStreamBean();
                 stream1.setName(getString(R.string.hd_720));
-                stream1.setUri(url1);
+                stream1.setUri(url4);
                 stream1.setLive(false);
                 ijkVideoStreamBeanList.add(stream1);
                 IjkVideoStreamBean stream2 = new IjkVideoStreamBean();

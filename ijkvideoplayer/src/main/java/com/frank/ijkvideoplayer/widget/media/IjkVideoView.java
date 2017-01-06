@@ -1634,7 +1634,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         } else {
             iv_pause.setImageResource(R.drawable.ic_play);
         }
-        if (mCurrentState == STATE_ERROR) {
+        if (mCurrentState == STATE_ERROR
+                || (ll_loading_container != null && ll_loading_container.getVisibility() == View.VISIBLE)) {
             setViewVisible(iv_pause, false);
         } else {
             setViewVisible(iv_pause, true);
@@ -1730,6 +1731,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         if (!mPrompted && networkPrompt()) {
             return;
         }
+        hideLoadingDescription();
+        setLoadingContainerVisible(true);
         if (isInPlaybackState()) {
             log("mMediaPlayer.start()");
             mMediaPlayer.start();
