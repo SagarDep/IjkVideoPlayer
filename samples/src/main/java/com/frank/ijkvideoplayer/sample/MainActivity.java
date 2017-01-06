@@ -45,7 +45,7 @@ public class MainActivity extends AppCompatActivity {
                 ijkVideoStreamBeanList.add(stream1);
                 IjkVideoStreamBean stream2 = new IjkVideoStreamBean();
                 stream2.setName(getString(R.string.hd_1080));
-                stream2.setUri(url3);
+                stream2.setUri(url1);
                 stream2.setLive(true);
                 ijkVideoStreamBeanList.add(stream2);
                 mVideoView.loadLibrary();
