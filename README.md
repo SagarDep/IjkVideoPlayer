@@ -9,11 +9,13 @@
 - 支持播放完毕的重新播放
 - 支持音量和亮度的拖等手势，支持进度的拖动手势
 - 支持友好的出错提示及重新获取按钮
-- 支持加速传感器的方向监听
+- 支持竖屏全屏切换
+- 支持加速传感器的方向监听，支持启用禁用传感器
 - 支持屏幕方向锁定
+- 支持保存上次观看进度
 
-![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screen_1.png?raw=true)
 ![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screen_2.png?raw=true)
+![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screen_1.png?raw=true)
 Thanks
 ------
 - [Bilibili/ijkplayer](https://github.com/Bilibili/ijkplayer)
