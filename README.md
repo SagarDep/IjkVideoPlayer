@@ -12,8 +12,8 @@
 - 支持加速传感器的方向监听
 - 支持屏幕方向锁定
 
-![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screenshot_1.png)
-![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screenshot_2.png)
+![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screen_1.png?raw=true)
+![ScreenShot](https://github.com/shangmingchao/IjkVideoPlayer/blob/master/art/screen_2.png?raw=true)
 Thanks
 ------
 - [Bilibili/ijkplayer](https://github.com/Bilibili/ijkplayer)
