@@ -818,6 +818,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
             // we don't set the target state here either, but preserve the
             // target state that was there before.
             mCurrentState = STATE_PREPARING;
+            hideLoadingDescription();
+            setLoadingContainerVisible(true);
             attachMediaController();
         } catch (Exception e) {
             e.printStackTrace();
@@ -1731,8 +1733,6 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
         if (!mPrompted && networkPrompt()) {
             return;
         }
-        hideLoadingDescription();
-        setLoadingContainerVisible(true);
         if (isInPlaybackState()) {
             log("mMediaPlayer.start()");
             mMediaPlayer.start();
