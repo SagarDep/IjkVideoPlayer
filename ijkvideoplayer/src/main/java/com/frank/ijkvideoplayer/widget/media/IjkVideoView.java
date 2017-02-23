@@ -326,9 +326,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     public void loadLibrary() {
         // init player
-        IjkMediaPlayer.loadLibrariesOnce(null);
-        IjkMediaPlayer.native_profileBegin("libijkplayer.so");
-        IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_SILENT);
+//        IjkMediaPlayer.loadLibrariesOnce(null);
+//        IjkMediaPlayer.native_profileBegin("libijkplayer.so");
+//        IjkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_SILENT);
     }
 
     public void destroy() {
@@ -869,9 +869,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
         @Override
         public void onStopTrackingTouch(SeekBar bar) {
-            if (mMediaControllerDragging && mSeekTime > 0) {
-                seekTo((int) mSeekTime);
+            if (mMediaControllerDragging && mSeekTime >= 0) {
                 mMediaControllerDragging = false;
+                seekTo((int) mSeekTime);
                 setMediaControllerProgress();
                 updatePausePlay();
                 showMediaController(MEDIA_CONTROLLER_TIMEOUT);
@@ -1814,6 +1814,8 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void seekTo(int msec) {
+        hideLoadingDescription();
+        setLoadingContainerVisible(true);
         if (isInPlaybackState()) {
             mSeekStartTime = System.currentTimeMillis();
             mMediaPlayer.seekTo(msec);
@@ -1987,7 +1989,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     private void log(String message) {
         if (mEnableLogging) {
-            Log.d(TAG, message);
+            Log.e(TAG, message);
         }
     }
 

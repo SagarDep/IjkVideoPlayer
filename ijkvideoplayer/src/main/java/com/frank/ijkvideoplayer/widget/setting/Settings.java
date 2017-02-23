@@ -112,7 +112,7 @@ public class Settings {
      * @return true硬解码，false软解码
      */
     public boolean getUsingMediaCodec() {
-        return mSharedPreferences.getBoolean(USING_MEDIA_CODEC_KEY, false);
+        return mSharedPreferences.getBoolean(USING_MEDIA_CODEC_KEY, true);
     }
 
     /**
@@ -132,7 +132,7 @@ public class Settings {
      * @return true使用，false未使用
      */
     public boolean getUsingMediaCodecAutoRotate() {
-        return mSharedPreferences.getBoolean(USING_MEDIA_CODEC_AUTO_ROTATE_KEY, false);
+        return mSharedPreferences.getBoolean(USING_MEDIA_CODEC_AUTO_ROTATE_KEY, true);
     }
 
     /**
@@ -152,7 +152,7 @@ public class Settings {
      * @return true使用，false未使用
      */
     public boolean getMediaCodecHandleResolutionChange() {
-        return mSharedPreferences.getBoolean(MEDIA_CODEC_HANDLE_RESOLUTION_CHANGE_KEY, false);
+        return mSharedPreferences.getBoolean(MEDIA_CODEC_HANDLE_RESOLUTION_CHANGE_KEY, true);
     }
 
     /**
