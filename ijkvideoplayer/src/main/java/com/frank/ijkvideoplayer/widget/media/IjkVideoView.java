@@ -1755,11 +1755,13 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     public void continuePlay() {
         mCurrentState = STATE_PAUSED;
         setErrorContainerVisible(false);
+        setLoadingContainerVisible(true);
         start();
     }
 
     public void replay() {
         mCurrentState = STATE_PLAYBACK_COMPLETED;
+        setErrorContainerVisible(false);
         hideLoadingDescription();
         setLoadingContainerVisible(true);
         if (mLive) {
@@ -1989,7 +1991,7 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
 
     private void log(String message) {
         if (mEnableLogging) {
-            Log.e(TAG, message);
+            Log.d(TAG, message);
         }
     }
 
@@ -2006,7 +2008,9 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     }
 
     public void setLoadingContainerVisible(boolean visible) {
-        if (visible && !mMediaControllerDragging) {
+        if (visible && !mMediaControllerDragging
+                && ll_error_container != null
+                && ll_error_container.getVisibility() != View.VISIBLE) {
             setViewVisible(ll_loading_container, true);
             setViewVisible(ll_error_container, false);
             setViewVisible(iv_pause, false);
