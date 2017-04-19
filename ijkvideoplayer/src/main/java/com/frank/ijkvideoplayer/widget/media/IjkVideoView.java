@@ -1755,13 +1755,11 @@ public class IjkVideoView extends FrameLayout implements View.OnTouchListener, V
     public void continuePlay() {
         mCurrentState = STATE_PAUSED;
         setErrorContainerVisible(false);
-        setLoadingContainerVisible(true);
         start();
     }
 
     public void replay() {
         mCurrentState = STATE_PLAYBACK_COMPLETED;
-        setErrorContainerVisible(false);
         hideLoadingDescription();
         setLoadingContainerVisible(true);
         if (mLive) {
